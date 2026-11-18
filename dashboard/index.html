@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launch-Odds Radar — pre-token protocols ranked by expected value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <div class="pulse" aria-hidden="true"></div>
+    <div>
+      <h1>Launch-Odds Radar</h1>
+      <p class="sub">Pre-token protocols ranked by expected value — terminal value × launch odds</p>
+    </div>
+  </div>
+  <dl class="stats" id="stats"></dl>
+</header>
+
+<section class="model" id="model">
+  <h2>How the price is made</h2>
+  <p class="formula">implied value = K · TVL<sup>0.8</sup> · growth · age · breadth · launch odds</p>
+  <ul>
+    <li><b>Terminal value</b> — K · TVL<sup>0.8</sup>. Value grows slower than TVL: a protocol ten times bigger is worth about six times more, not ten. K is anchored to this snapshot itself — the median tokenised market cap over the median tokenised TVL<sup>0.8</sup> — so no number is imported from outside and no single outlier sets the price.</li>
+    <li><b>Growth</b> — the 7-day TVL move, damped to ±20% and compounded over eight weeks, clamped to 0.5–2.0.</li>
+    <li><b>Age</b> — how long the protocol has run with no token, on a log scale: older means more overdue. Missing listing date counts as neutral.</li>
+    <li><b>Breadth</b> — 1 + 0.15 · log<sub>2</sub>(chains), capped at 1.8: each extra chain adds reach.</li>
+    <li><b>Launch odds</b> — the share of protocols in the same category that already have a token, shrunk toward the snapshot-wide rate (prior weight 5). A big protocol in a category that almost never tokenises ranks below a smaller one in a category that usually does.</li>
+  </ul>
+  <p class="note">Nothing is priced by name: one function scores every protocol from the snapshot's own ten fields. “Records no token” means DefiLlama records none — a protocol on this board may still have a token its record does not carry. Implied values are this radar's claim, not a prediction of if or when a token is issued.</p>
+</section>
+
+<section class="controls" aria-label="Filters">
+  <label>Search <input id="q" type="search" placeholder="protocol name or slug" autocomplete="off"></label>
+  <label>Category <select id="category"></select></label>
+  <label>Chain <select id="chain"></select></label>
+  <label class="check"><input id="watchlist" type="checkbox"> Watchlist only</label>
+  <label>Min odds <input id="minodds" type="range" min="0" max="90" value="0" step="5"> <output id="minodds-out">0%</output></label>
+  <span class="count" id="count"></span>
+</section>
+
+<main class="layout">
+  <div class="board-wrap">
+    <table class="board" id="board">
+      <thead>
+        <tr>
+          <th data-sort="rank">#</th>
+          <th data-sort="name">Protocol</th>
+          <th data-sort="category">Category</th>
+          <th data-sort="tvl_usd">TVL</th>
+          <th data-sort="change_7d">7d</th>
+          <th data-sort="age_days">Age</th>
+          <th data-sort="odds">Launch odds</th>
+          <th data-sort="implied_value_usd">Implied value</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <aside class="detail" id="detail" aria-live="polite"></aside>
+</main>
+
+<footer>
+  <p>Snapshot: sealed DefiLlama data, fetched 14 Nov 2026. Board covers the whole 40-protocol watchlist plus every rankable pre-token protocol below the $50M floor — 201 rows. Farm plans are this radar's own suggestions, not financial advice.</p>
+</footer>
+
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
