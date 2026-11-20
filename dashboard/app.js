@@ -1,6 +1,7 @@
-// Launch-Odds Radar's dashboard. It reads window.RADAR (written beside
-// dashboard/ by main.ts) and renders the ranked board, the filters and a
-// per-protocol detail view with the model's own arithmetic and the farm plan.
+// Launch-Odds Radar v2's dashboard. It reads window.RADAR (written beside
+// dashboard/ by main.ts) and renders the ranked board, the filters, a
+// per-protocol detail view with the model's own arithmetic and the farm plan,
+// the peer multiples the price is fitted from, and the already-trading peers.
 // No network: every byte it shows is in data.js. Views are deep-linkable:
 // #detail=<slug> opens a protocol, #watchlist=1 shows the watchlist only,
 // #category=<name> and #chain=<name> pre-set the filters.
@@ -14,7 +15,8 @@
   var meta = DATA.meta;
 
   var state = {
-    q: '', category: 'all', chain: 'all', watchlist: false, minOdds: 0,
+    q: '', category: 'all', chain: 'all', verdict: 'all',
+    watchlist: false, minOdds: 0,
     sort: 'rank', dir: 1, selected: null,
   };
 
@@ -48,12 +50,15 @@
   (function stats() {
     var box = document.getElementById('stats');
     var top = rows[0];
+    var sorted = rows.map(function (r) { return r.implied_value_usd; }).sort(function (a, b) { return a - b; });
+    var med = sorted[Math.floor(sorted.length / 2)];
     var items = [
       ['Board', String(rows.length) + ' rows'],
       ['Watchlist', String(meta.watchlist) + ' covered'],
       ['Top implied', top ? fmtUsd(top.implied_value_usd) : 'n/a'],
+      ['Median implied', fmtUsd(med)],
+      ['Set aside', String(meta.excluded_rule + meta.excluded_house)],
       ['Snapshot', meta.as_of],
-      ['Floor', fmtUsd(meta.floor_usd)],
     ];
     items.forEach(function (kv) {
       var wrap = el('div');
@@ -63,10 +68,53 @@
     });
   })();
 
+  // ---- fit evidence -------------------------------------------------------
+  (function evidence() {
+    var v = meta.validation;
+    var box = document.getElementById('evidence');
+    if (!box || !v) return;
+    box.textContent = 'Held out and tested: the fit trains on ' + v.train_n + ' traded protocols and predicts the ' + v.test_n +
+      ' it never saw. Its typical miss is ×' + v.fitted_error_factor + ' (median |log error| ' + v.fitted_median_log_error +
+      '), against ×' + v.baseline_error_factor + ' for the naive snapshot-wide median multiple. ' +
+      'The fitted size curve is log factor = ' + v.size_intercept + ' + ' + v.size_slope + ' · ln(TVL): a protocol ten times bigger carries a multiple about ' +
+      (Math.pow(10, v.size_slope)).toFixed(2) + '× as large. The snapshot-wide median mcap/TVL is ' + v.global_median_ratio + '.';
+  })();
+
+  // ---- peer multiples -----------------------------------------------------
+  (function peers() {
+    var tbody = document.getElementById('peer-rows');
+    if (!tbody || !DATA.peer_multiples) return;
+    DATA.peer_multiples.slice(0, 10).forEach(function (p) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, p.category));
+      tr.appendChild(el('td', 'num', String(p.peers)));
+      tr.appendChild(el('td', 'num', p.median.toFixed(2)));
+      tr.appendChild(el('td', 'num', p.multiple.toFixed(2)));
+      tbody.appendChild(tr);
+    });
+  })();
+
+  // ---- already trading ----------------------------------------------------
+  (function live() {
+    var tbody = document.getElementById('live-rows');
+    if (!tbody || !DATA.live) return;
+    DATA.live.forEach(function (p) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, p.name));
+      tr.appendChild(el('td', null, p.category || '—'));
+      tr.appendChild(el('td', null, p.chains.slice(0, 2).join(', ') + (p.chains.length > 2 ? ' +' + (p.chains.length - 2) : '')));
+      tr.appendChild(el('td', 'num', fmtUsd(p.tvl_usd)));
+      tr.appendChild(el('td', 'num', fmtUsd(p.mcap_usd)));
+      tr.appendChild(el('td', 'num', p.mcap_per_tvl === null ? 'n/a' : p.mcap_per_tvl.toFixed(2)));
+      tbody.appendChild(tr);
+    });
+  })();
+
   // ---- filter controls --------------------------------------------------
   var qInput = document.getElementById('q');
   var catSel = document.getElementById('category');
   var chainSel = document.getElementById('chain');
+  var verdictSel = document.getElementById('verdict');
   var watchBox = document.getElementById('watchlist');
   var oddsInput = document.getElementById('minodds');
   var oddsOut = document.getElementById('minodds-out');
@@ -93,6 +141,7 @@
       if (state.watchlist && !r.on_watchlist) return false;
       if (state.category !== 'all' && (r.category || '(none)') !== state.category) return false;
       if (state.chain !== 'all' && r.chains.indexOf(state.chain) === -1) return false;
+      if (state.verdict !== 'all' && r.verdict !== state.verdict) return false;
       if (r.odds * 100 < state.minOdds) return false;
       if (q && r.name.toLowerCase().indexOf(q) === -1 && r.slug.indexOf(q) === -1) return false;
       return true;
@@ -116,7 +165,7 @@
     if (list.length === 0) {
       var tr = el('tr');
       var td = el('td', 'empty', 'No protocol matches these filters.');
-      td.colSpan = 8;
+      td.colSpan = 9;
       tr.appendChild(td);
       root.appendChild(tr);
     }
@@ -145,11 +194,19 @@
       wrap.appendChild(el('b', null, Math.round(r.odds * 100) + '%'));
       oddsTd.appendChild(wrap);
       tr.appendChild(oddsTd);
+      var verdictTd = el('td');
+      verdictTd.appendChild(verdictBadge(r.verdict));
+      tr.appendChild(verdictTd);
       tr.appendChild(el('td', 'num', fmtUsd(r.implied_value_usd)));
       tr.addEventListener('click', function () { select(r.slug, true); });
       root.appendChild(tr);
     });
     countOut.textContent = list.length + ' of ' + rows.length + ' protocols';
+  }
+
+  function verdictBadge(v) {
+    var s = el('span', 'verdict v-' + v.toLowerCase(), v);
+    return s;
   }
 
   // ---- detail view --------------------------------------------------------
@@ -169,11 +226,15 @@
     box.appendChild(el('h3', null, 'The model, in the open'));
     var table = el('table', 'decomp');
     var lines = [
-      ['Terminal value', fmtUsd(r.terminal_usd), 'K · TVL^0.8'],
-      ['Growth (7d, 8wk)', fmtFactor(r.growth), r.change_7d === null ? 'no 7d figure: 1.00×' : fmtPct(r.change_7d / 100) + ' a week'],
-      ['Age factor', fmtFactor(r.age_factor), r.age_days === null ? 'listing date unknown' : fmtAge(r.age_days) + ' with no token'],
+      ['Terminal value', fmtUsd(r.terminal_usd), 'TVL · ' + r.peer_multiple.toFixed(2) + ' multiple · ' + fmtFactor(r.size_factor) + ' size'],
+      ['Growth (7d, damped)', fmtFactor(r.growth), r.change_7d === null ? 'no 7d figure: 1.00×' : fmtPct(r.change_7d / 100) + ' a week'],
+      ['Age factor', fmtFactor(r.age_factor), r.age_days === null ? 'listing date unknown: 1 year' : fmtAge(r.age_days) + ' with no token'],
       ['Breadth', fmtFactor(r.breadth), r.chains.length + (r.chains.length === 1 ? ' chain' : ' chains')],
+      ['Implied value', fmtUsd(r.implied_value_usd), 'terminal × growth × age × breadth'],
       ['Launch odds', Math.round(r.odds * 100) + '%', 'category tokenisation rate, shrunk'],
+      ['Expected value', fmtUsd(r.expected_value_usd), 'implied × odds'],
+      ['Farm cost', '$' + r.farm_cost_usd, 'capital $' + r.farm_capital_usd + ' + ~$' + r.farm_gas_usd + ' gas'],
+      ['Verdict', r.verdict, r.verdict === 'Farm' ? 'expected value over $10M' : r.verdict === 'Watch' ? 'expected value $2M–$10M' : 'expected value under $2M'],
     ];
     lines.forEach(function (line) {
       var row = el('tr');
@@ -182,15 +243,10 @@
       row.appendChild(el('td', null, line[1]));
       table.appendChild(row);
     });
-    var total = el('tr', 'total');
-    total.appendChild(el('td', null, 'Implied value'));
-    total.appendChild(el('td', null, 'terminal × growth × age × breadth × odds'));
-    total.appendChild(el('td', null, fmtUsd(r.implied_value_usd)));
-    table.appendChild(total);
     box.appendChild(table);
     // The page recomputes the row from its own factors, so the number on
     // screen and the number in board.json are visibly the same arithmetic.
-    var check = Math.round(r.terminal_usd * r.growth * r.age_factor * r.breadth * r.odds);
+    var check = Math.round(r.terminal_usd * r.growth * r.age_factor * r.breadth);
     var note = el('p', 'meta', check === r.implied_value_usd
       ? 'Recomputed on this page: ' + fmtUsd(check) + ' — matches board.json.'
       : 'Recomputed on this page: ' + fmtUsd(check) + ' (rounding).');
@@ -216,6 +272,7 @@
       if (k === 'watchlist' && v === '1') state.watchlist = true;
       if (k === 'category' && v) state.category = v;
       if (k === 'chain' && v) state.chain = v;
+      if (k === 'verdict' && v) state.verdict = v;
       if (k === 'q' && v) state.q = v;
       if (k === 'minodds' && v) state.minOdds = parseInt(v, 10) || 0;
     });
@@ -226,6 +283,7 @@
     if (state.watchlist) parts.push('watchlist=1');
     if (state.category !== 'all') parts.push('category=' + encodeURIComponent(state.category));
     if (state.chain !== 'all') parts.push('chain=' + encodeURIComponent(state.chain));
+    if (state.verdict !== 'all') parts.push('verdict=' + encodeURIComponent(state.verdict));
     if (state.q) parts.push('q=' + encodeURIComponent(state.q));
     if (state.minOdds) parts.push('minodds=' + state.minOdds);
     var next = parts.join('&');
@@ -237,6 +295,7 @@
   qInput.addEventListener('input', function () { state.q = qInput.value; writeHash(); renderRows(); });
   catSel.addEventListener('change', function () { state.category = catSel.value; writeHash(); renderRows(); });
   chainSel.addEventListener('change', function () { state.chain = chainSel.value; writeHash(); renderRows(); });
+  verdictSel.addEventListener('change', function () { state.verdict = verdictSel.value; writeHash(); renderRows(); });
   watchBox.addEventListener('change', function () { state.watchlist = watchBox.checked; writeHash(); renderRows(); });
   oddsInput.addEventListener('input', function () {
     state.minOdds = parseInt(oddsInput.value, 10) || 0;
@@ -257,6 +316,7 @@
   qInput.value = state.q;
   catSel.value = state.category;
   chainSel.value = state.chain;
+  verdictSel.value = state.verdict;
   watchBox.checked = state.watchlist;
   oddsInput.value = String(state.minOdds);
   oddsOut.textContent = state.minOdds + '%';

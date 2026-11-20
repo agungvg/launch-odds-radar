@@ -70,12 +70,12 @@ h1 { margin: 0; font-size: 26px; letter-spacing: .3px; }
 .controls input[type="search"] { width: 190px; }
 .count { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 .layout {
-  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px;
   gap: 14px; margin: 14px 24px;
 }
 .board-wrap { overflow-x: auto; }
-table.board { width: 100%; border-collapse: collapse; font-size: 13px; }
-.board th, .board td { padding: 6px 7px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.board { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.board th, .board td { padding: 6px 5px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .board td:nth-child(3) { white-space: normal; }
 .board th {
   position: sticky; top: 0; background: var(--panel);
@@ -116,6 +116,27 @@ table.board { width: 100%; border-collapse: collapse; font-size: 13px; }
 .steps { margin: 0; padding-left: 20px; font-size: 13.5px; }
 .steps li { margin: 7px 0; }
 .empty { color: var(--muted); font-size: 14px; }
+.evidence {
+  margin: 8px 0 0; padding: 8px 10px; font-size: 13px; color: #d6dcee;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+}
+.model h3 { margin: 12px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); }
+table.peers { border-collapse: collapse; font-size: 13px; }
+.peers th, .peers td { padding: 4px 12px 4px 0; text-align: left; border-bottom: 1px solid var(--line); }
+.peers td.num, .peers th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.verdict {
+  display: inline-block; font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 7px;
+}
+.v-farm { color: #052e16; background: var(--good); }
+.v-watch { color: #1a1405; background: var(--accent); }
+.v-track { color: var(--muted); background: #1d2547; }
+.peers-sec { margin: 0 24px 14px; }
+.peers-sec h2 { margin: 0 0 4px; font-size: 16px; }
+.peers-sec .note { margin: 0 0 8px; }
+.live { margin: 0 24px 14px; }
+.live h2 { margin: 0 0 4px; font-size: 16px; }
+.live .note { margin: 0 0 8px; }
+.live table.board { font-size: 13px; }
 footer { margin: 0 24px 20px; color: var(--muted); font-size: 12.5px; }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }

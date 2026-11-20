@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Launch-Odds Radar — pre-token protocols ranked by expected value</title>
+<title>Launch-Odds Radar — pre-token protocols ranked by fitted value</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <div class="pulse" aria-hidden="true"></div>
     <div>
       <h1>Launch-Odds Radar</h1>
-      <p class="sub">Pre-token protocols ranked by expected value — terminal value × launch odds</p>
+      <p class="sub">Pre-token protocols ranked by fitted value — comparables-priced, held out and tested</p>
     </div>
   </div>
   <dl class="stats" id="stats"></dl>
@@ -20,21 +20,24 @@
 
 <section class="model" id="model">
   <h2>How the price is made</h2>
-  <p class="formula">implied value = K · TVL<sup>0.8</sup> · growth · age · breadth · launch odds</p>
+  <p class="formula">implied value = TVL · peer multiple · size factor · growth · age · breadth</p>
   <ul>
-    <li><b>Terminal value</b> — K · TVL<sup>0.8</sup>. Value grows slower than TVL: a protocol ten times bigger is worth about six times more, not ten. K is anchored to this snapshot itself — the median tokenised market cap over the median tokenised TVL<sup>0.8</sup> — so no number is imported from outside and no single outlier sets the price.</li>
-    <li><b>Growth</b> — the 7-day TVL move, damped to ±20% and compounded over eight weeks, clamped to 0.5–2.0.</li>
-    <li><b>Age</b> — how long the protocol has run with no token, on a log scale: older means more overdue. Missing listing date counts as neutral.</li>
-    <li><b>Breadth</b> — 1 + 0.15 · log<sub>2</sub>(chains), capped at 1.8: each extra chain adds reach.</li>
-    <li><b>Launch odds</b> — the share of protocols in the same category that already have a token, shrunk toward the snapshot-wide rate (prior weight 5). A big protocol in a category that almost never tokenises ranks below a smaller one in a category that usually does.</li>
+    <li><b>Peer multiple</b> — the category's median market-cap-per-TVL among tokens that already trade, winsorized at 5 and shrunk toward the snapshot-wide median (weight 8).</li>
+    <li><b>Size factor</b> — a fitted log-log curve: bigger protocols carry a lower multiple. Fitted on the snapshot's own traded tokens, not assumed.</li>
+    <li><b>Growth</b> — the 7-day TVL move, damped to ±35% of its size and never compounded: one week is noise, not a trend.</li>
+    <li><b>Age</b> — how long the protocol has run with no token, on a log scale: older means more overdue. Missing listing date counts as one year.</li>
+    <li><b>Breadth</b> — 1 + 0.02 per extra chain, at most +10%.</li>
+    <li><b>Launch odds</b> — the share of protocols in the same category that already have a token, shrunk toward the snapshot-wide rate. Odds do not shrink the value: they set the expected value and the farm verdict.</li>
   </ul>
-  <p class="note">Nothing is priced by name: one function scores every protocol from the snapshot's own ten fields. “Records no token” means DefiLlama records none — a protocol on this board may still have a token its record does not carry. Implied values are this radar's claim, not a prediction of if or when a token is issued.</p>
+  <p class="evidence" id="evidence"></p>
+  <p class="note">Nothing is priced by name: one function scores every protocol from the snapshot's own ten fields. “Records no token” means DefiLlama records none — a protocol on this board may still have a token its record does not carry. Implied values are this radar's claim, not a prediction of if or when a token is issued. Farm plans are this radar's own suggestions, not financial advice.</p>
 </section>
 
 <section class="controls" aria-label="Filters">
   <label>Search <input id="q" type="search" placeholder="protocol name or slug" autocomplete="off"></label>
   <label>Category <select id="category"></select></label>
   <label>Chain <select id="chain"></select></label>
+  <label>Verdict <select id="verdict"><option value="all">All verdicts</option><option value="Farm">Farm</option><option value="Watch">Watch</option><option value="Track">Track</option></select></label>
   <label class="check"><input id="watchlist" type="checkbox"> Watchlist only</label>
   <label>Min odds <input id="minodds" type="range" min="0" max="90" value="0" step="5"> <output id="minodds-out">0%</output></label>
   <span class="count" id="count"></span>
@@ -51,7 +54,8 @@
           <th data-sort="tvl_usd">TVL</th>
           <th data-sort="change_7d">7d</th>
           <th data-sort="age_days">Age</th>
-          <th data-sort="odds">Launch odds</th>
+          <th data-sort="odds">Odds</th>
+          <th data-sort="verdict">Verdict</th>
           <th data-sort="implied_value_usd">Implied value</th>
         </tr>
       </thead>
@@ -61,8 +65,26 @@
   <aside class="detail" id="detail" aria-live="polite"></aside>
 </main>
 
+<section class="peers-sec" id="peers-sec">
+  <h2>Peer multiples, highest first</h2>
+  <p class="note">Each category's median market-cap-per-TVL among its traded tokens, and the shrunk multiple the model actually uses. A category with one traded peer cannot set its own multiple — the shrinkage pulls it toward the snapshot-wide median of 0.29.</p>
+  <table class="peers" id="peers">
+    <thead><tr><th>Category</th><th>Peers</th><th>Median mcap/TVL</th><th>Multiple used</th></tr></thead>
+    <tbody id="peer-rows"></tbody>
+  </table>
+</section>
+
+<section class="live" id="live">
+  <h2>Already trading — the peers the multiples come from</h2>
+  <p class="note">The 24 largest tokens in the snapshot, by market cap. Their market-cap-per-TVL is what sets every category multiple above; exchanges are left out.</p>
+  <table class="board" id="live-table">
+    <thead><tr><th>Protocol</th><th>Category</th><th>Chains</th><th>TVL</th><th>Market cap</th><th>Mcap / TVL</th></tr></thead>
+    <tbody id="live-rows"></tbody>
+  </table>
+</section>
+
 <footer>
-  <p>Snapshot: sealed DefiLlama data, fetched 14 Nov 2026. Board covers the whole 40-protocol watchlist plus every rankable pre-token protocol below the $50M floor — 201 rows. Farm plans are this radar's own suggestions, not financial advice.</p>
+  <p>Snapshot: sealed DefiLlama data, fetched 14 Nov 2026. Board covers the whole 40-protocol watchlist plus every rankable pre-token protocol below the $50M floor — 178 rows. 164 look-alikes are set aside: wrapped, staked or bridged products, exchanges and versioned pools, plus rankable protocols above the floor the watchlist leaves out.</p>
 </footer>
 
 <script src="../data.js"></script>

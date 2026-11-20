@@ -1,7 +1,7 @@
-// Launch-odds radar: the entrypoint the grader runs.
+// Launch-odds radar v2: the entrypoint the grader runs.
 //
 // Reads the sealed snapshot from /input/snapshot.json (or --input <file|dir>),
-// scores every plausible pre-token protocol with the expected-value model in
+// scores every plausible pre-token protocol with the fitted comps model in
 // lib/model.ts, writes the ranked board to /output/board.json, writes the
 // dashboard's data beside the page as /output/data.js, copies this
 // repository's dashboard/ and screenshots/ to /output, and writes
@@ -108,7 +108,9 @@ writeFileSync(
 );
 
 const watchlistRows = board.filter((r) => r.on_watchlist).length;
+const verdicts = { Farm: 0, Watch: 0, Track: 0 };
+for (const r of board) verdicts[r.verdict] += 1;
 process.stdout.write(
-  `launch-odds radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${watchlistRows} watchlist, ${board.length - watchlistRows} below the floor)\n` +
-    `launch-odds radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')}, ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
+  `launch-odds radar v2: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${watchlistRows} watchlist, ${board.length - watchlistRows} below the floor); verdicts Farm ${verdicts.Farm}, Watch ${verdicts.Watch}, Track ${verdicts.Track}\n` +
+    `launch-odds radar v2: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')}, ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
